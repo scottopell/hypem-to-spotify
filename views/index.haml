@@ -1,0 +1,27 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+%h2 Tracks
+
+%table
+  %thead
+    %th Title
+    %th Artist
+    %th Loved Count
+    %th Loved By
+  %tbody
+    - @tracks.each do |track|
+      %tr
+        %td
+          = track["title"]
+        %td
+          = track["artist"]
+        %td
+          = track["loved_count"]
+        %td
+          = track["loved_by"]
+
+%h2 Users
+
+%ul
+  - @users.each do |user|
+    %li
+      = user["name"]
