@@ -4,20 +4,32 @@
 %table
   %thead
     %th Title
+    %th Clean Title
     %th Artist
     %th Loved Count
     %th Loved By
+    %th Is Remix?
+    %th Remix Artist
+    %th Feat Artist(s)
   %tbody
     - @tracks.each do |track|
       %tr
         %td
           = track["title"]
         %td
+          = track["clean_title"]
+        %td
           = track["artist"]
         %td
           = track["loved_count"]
         %td
           = track["loved_by"]
+        %td
+          = track["is_remix"] ? "YES" : "NO"
+        %td
+          = track["remix_artist"]
+        %td
+          = track["featured_artists"]
 
 %h2 Users
 

@@ -1,9 +1,17 @@
 source 'https://rubygems.org'
 
-gem 'spotify', '~> 12.6.0'
-gem 'awesome_print', group: :development
-gem 'pry', group: :development
-gem 'rerun', group: :development
+gem 'rspotify'
 gem 'mongo', '~> 2.2'
-gem 'sinatra'
+gem 'sinatra', require: false
 gem 'haml'
+gem 'nokogiri'
+gem 'json'
+
+
+group :development do
+  gem 'awesome_print'
+  gem 'pry'
+  gem 'pry-byebug'
+  gem 'rerun'
+  gem 'dotenv'
+end

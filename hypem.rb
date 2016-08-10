@@ -1,10 +1,5 @@
-require 'awesome_print'
-require 'optparse'
-require 'httparty'
-require 'mongo'
-require 'json'
-require 'pry'
-require_relative "support"
+require 'bundler/setup'
+Bundler.require(:default, :test, :development)
 
 module Tty extend self
   def blue; bold 34; end
@@ -36,8 +31,9 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-users = ['longscott', 'glupin23', 'therealpunit']
+users = ['longscott']
 client = Mongo::Client.new('mongodb://127.0.0.1:27017/hype')
+Dotenv.load
 
 def user_fav_url user, page=1
   "https://api.hypem.com/v2/users/#{user}/favorites?key=swagger&page=#{page}"
@@ -97,6 +93,30 @@ def update_hypem! users, client, logging = false
       db_users[user]["loved_songs"].push({ itemid: s["itemid"],
                                            ts_loved: s["ts_loved"] })
 
+      # parse out boolean remix and remix artist
+      m = s["title"].match(/.+\(([^)]+)remix\)/i)
+      s["is_remix"] = false
+      if m && m.length == 2
+        s["is_remix"] = true
+        s["remix_artist"] = m[1]
+      end
+
+      # parse out featuring artists
+      # examples:
+      # You & Me feat. Eliza Doolittle (Flume Remix)
+      # Cheap Sunglasses (feat. Matthew Koma)
+      # Timber feat. Ke$ha
+      artists = s["title"].split(/feat\.?/)
+      if artists.length > 1
+        # artists[1] could contain
+        # Eliza Doolittle (Flume Remix)
+        # Matthew Koma)
+        # Ke$ha
+        s["featured_artists"] = artists[1].split("(").first.split(")").first
+      end
+
+      s["clean_title"] = s["title"].split(/feat\.?/).first.split("(").first
+
       s["loved_by"] = [] if s["loved_by"].nil?
       s["loved_by"].push(user)
       s.delete("ts_loved")
@@ -151,76 +171,24 @@ def update_hypem! users, client, logging = false
 end
 
 def update_spotify! client
-  session = Support.initialize_spotify!
-  username = Support.prompt("Please enter a username", "burgestrand")
-  user_link = "spotify:user:#{username}"
-  link = Spotify.link_create_from_string(user_link)
+  RSpotify.authenticate(ENV["SPOTIFY_CLIENT_ID"], ENV["SPOTIFY_CLIENT_SECRET"])
 
-  if link.null?
-    $logger.error "#{user_link} was apparently not parseable as a Spotify URI. Aborting."
-    abort
-  end
+  # Now you can access playlists in detail, browse featured content and more
+  me = RSpotify::User.find(ENV["SPOTIFY_USER"])
+  collection_tracks = client[:tracks]
 
-  user = Spotify.link_as_user(link)
-  $logger.info "Attempting to load #{user_link}. Waiting forever until successful."
-  Support.poll(session) { Spotify.user_is_loaded(user) }
+  collection_tracks.find.limit(20).each do |track|
+    query = "track:#{track["clean_title"]} #{track["remix_artist"]}" +
+            " #{track["featured_artists"]} artist:#{track["artist"]}"
+    result = RSpotify::Track.search(query).first
+    if result
+      name = result.name
+      artist = result.artists.first.name
 
-  display_name = Spotify.user_display_name(user)
-  canonical_name = Spotify.user_canonical_name(user)
-  $logger.info "User loaded: #{display_name}."
-
-  $logger.info "Loading user playlists by loading their published container: #{canonical_name}."
-  container = Spotify.session_publishedcontainer_for_user_create(session, canonical_name)
-
-  $logger.info "Attempting to load container. Waiting forever until successful."
-  Support.poll(session) { Spotify.playlistcontainer_is_loaded(container) }
-
-  $logger.info "Container loaded. Loading playlists until no more are loaded for three tries!"
-
-  container_size = 0
-  previous_container_size = 0
-  break_counter = 0
-
-  loop do
-    container_size = Spotify.playlistcontainer_num_playlists(container)
-    new_playlists = container_size - previous_container_size
-    previous_container_size = container_size
-    $logger.info "Loaded #{new_playlists} more playlists."
-
-    # If we have loaded no new playlists for 4 tries, we assume we are done.
-    if new_playlists == 0
-      break_counter += 1
-      if break_counter >= 4
-        break
-      end
-    end
-
-    $logger.info "Loading…"
-    5.times do
-      Support.process_events(session)
-      sleep 0.2
+      puts "#{Tty.green}\tSpotify Result: \"#{name} by #{artist}\"#{Tty.reset}"
     end
   end
 
-  $logger.info "#{container_size} published playlists for #{display_name} found. Loading each playlists and printing it."
-  container_size.times do |index|
-    type = Spotify.playlistcontainer_playlist_type(container, index)
-    playlist = Spotify.playlistcontainer_playlist(container, index)
-    Support.poll(session) { Spotify.playlist_is_loaded(playlist) }
-
-    playlist_name = Spotify.playlist_name(playlist)
-    num_tracks = Spotify.playlist_num_tracks(playlist)
-
-    # Retrieving link for playlist:
-    playlist_link = Spotify.link_create_from_playlist(playlist)
-    link_string = if playlist_link.nil?
-      "(no link)"
-    else
-      Spotify.link_as_string(playlist_link)
-    end
-
-    $logger.info "  (#{type}) #{playlist_name}: #{link_string} (#{num_tracks} tracks)"
-  end
 end
 
 if options[:update_hypem]
