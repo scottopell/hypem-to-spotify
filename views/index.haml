@@ -1,39 +1,60 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
-%h2 Tracks
+:css
+  .profile-box {
+    float: right;
+    width: 125px;
+  }
+  .header h1 {
+    display: inline-block;
+  }
 
-%table
-  %thead
-    %th Title
-    %th Clean Title
-    %th Artist
-    %th Loved Count
-    %th Loved By
-    %th Is Remix?
-    %th Remix Artist
-    %th Feat Artist(s)
-  %tbody
-    - @tracks.each do |track|
-      %tr
-        %td
-          = track["title"]
-        %td
-          = track["clean_title"]
-        %td
-          = track["artist"]
-        %td
-          = track["loved_count"]
-        %td
-          = track["loved_by"]
-        %td
-          = track["is_remix"] ? "YES" : "NO"
-        %td
-          = track["remix_artist"]
-        %td
-          = track["featured_artists"]
+.header
+  %h1 Hypem to Spotify
+  - if @user.nil?
+    %a{href: "/auth/spotify"}
+      Login to Spotify
+  - else
+    .profile-box
+      %p
+        = @user.display_name
+      %img{src: @user.images.first["url"], width: '100px', height: '100px'}
 
-%h2 Users
+.container
+  %h2 Tracks
 
-%ul
-  - @users.each do |user|
-    %li
-      = user["name"]
+  %table
+    %thead
+      %th Title
+      %th Clean Title
+      %th Artist
+      %th Loved Count
+      %th Loved By
+      %th Is Remix?
+      %th Remix Artist
+      %th Feat Artist(s)
+    %tbody
+      - @tracks.each do |track|
+        %tr
+          %td
+            = track["title"]
+          %td
+            = track["clean_title"]
+          %td
+            = track["artist"]
+          %td
+            = track["loved_count"]
+          %td
+            = track["loved_by"]
+          %td
+            = track["is_remix"] ? "YES" : "NO"
+          %td
+            = track["remix_artist"]
+          %td
+            = track["featured_artists"]
+
+  %h2 Users
+
+  %ul
+    - @users.each do |user|
+      %li
+        = user["name"]
