@@ -21,7 +21,10 @@ open "http://localhost:4567"
 ## What Works
 - Scraping loved songs to mongodb
 - Debugging web interface (basically a sanity check for what's in the DB)
+- Search for these songs on spotify
+- Spotify OAuth on the frontend
 
 ## What's left to do
-- Search for these songs on spotify
 - add all these songs to a playlist
+- integrate a job runner of some kind and rewrite the hypem->mongo as a job
+- transition to full-on webapp
