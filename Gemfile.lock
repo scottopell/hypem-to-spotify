@@ -99,6 +99,7 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.7.2)
+    will_paginate (3.1.0)
 
 PLATFORMS
   ruby
@@ -119,6 +120,7 @@ DEPENDENCIES
   rspotify
   sinatra
   sinatra-contrib
+  will_paginate (~> 3.1.0)
 
 BUNDLED WITH
    1.12.4

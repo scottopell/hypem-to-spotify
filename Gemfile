@@ -8,6 +8,7 @@ gem 'haml'
 gem 'nokogiri'
 gem 'json'
 gem 'httparty'
+gem 'will_paginate', '~> 3.1.0'
 
 
 group :development do
