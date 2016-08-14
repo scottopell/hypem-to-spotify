@@ -23,8 +23,8 @@ open "http://localhost:4567"
 - Debugging web interface (basically a sanity check for what's in the DB)
 - Search for these songs on spotify
 - Spotify OAuth on the frontend
+- integrate a job runner of some kind and rewrite the hypem->mongo as a job
 
 ## What's left to do
 - add all these songs to a playlist
-- integrate a job runner of some kind and rewrite the hypem->mongo as a job
 - transition to full-on webapp
