@@ -1,0 +1,25 @@
+!!!
+%html
+  %head
+    %link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css")
+    :css
+      .profile-box {
+        float: right;
+        width: 125px;
+      }
+      .header h1 {
+        display: inline-block;
+      }
+  %body
+    .header
+      %h1 Hypem to Spotify
+      - if spotify_user.nil?
+        %a{href: "/auth/spotify"}
+          Login to Spotify
+      - else
+        .profile-box
+          %p
+            = spotify_user.display_name
+          %img{src: spotify_user.images.first["url"], width: '100px', height: '100px'}
+    .container
+      = yield

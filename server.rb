@@ -10,14 +10,18 @@ require 'uri'
 require_relative './hype_parser'
 
 client = Mongo::Client.new('mongodb://127.0.0.1:27017/hype')
+
 track_collection = client[:tracks]
-user_collection = client[:users]
-job_collection = client[:jobs]
+user_collection  = client[:users]
+job_collection   = client[:jobs]
+
+Mongo::Logger.logger       = ::Logger.new('mongo.log')
+Mongo::Logger.logger.level = ::Logger::DEBUG
 
 Dotenv.load
 
 SPOTIFY_REDIRECT_PATH = '/auth/spotify/callback'
-SPOTIFY_REDIRECT_URI = "http://localhost:4567#{SPOTIFY_REDIRECT_PATH}"
+SPOTIFY_REDIRECT_URI  = "http://localhost:4567#{SPOTIFY_REDIRECT_PATH}"
 
 # http://www.sinatrarb.com/faq.html#sessions
 enable :sessions
@@ -33,6 +37,9 @@ Thread.new do
       job_collection.find.each do |job|
         if !job["scrape_user"].nil?
           HypeParser.update_hypem! [job["username"]], client, false
+          job_collection.delete_one("_id" => job["_id"])
+        elsif !job["refresh_spotify_results"].nil?
+          refresh_spotify_results client, job["itemids"]
           job_collection.delete_one("_id" => job["_id"])
         end
       end
@@ -61,6 +68,29 @@ get '/' do
   @user = spotify_user
 
   haml :index
+end
+
+get '/hype_user' do
+  @tracks = []
+  @target_user = user_collection.find(name: params['user_name']).limit(1).first
+
+  refresh_spotify_job = {
+    "refresh_spotify_results" => true,
+    "itemids" => []
+  }
+
+  @target_user["loved_songs"].each do |song|
+    track = track_collection.find(itemid: song["itemid"]).limit(1).first
+    if track["spotify_result"].nil? &&
+       Time.at(track["no_spotify_results"]) < 1.week.ago
+
+      refresh_spotify_job["itemids"] << song["itemid"]
+    end
+    @tracks << track
+  end
+  job_collection.insert_one refresh_spotify_job
+
+  haml :user_page
 end
 
 post '/submit_user_job' do
@@ -146,4 +176,45 @@ def spotify_user
   end
 
   RSpotify::User.new(session[:spotify_hash])
+end
+
+def refresh_spotify_results client, itemids
+  track_collection = client[:tracks]
+  tracks = []
+  itemids.each do |itemid|
+    track = track_collection.find(itemid: itemid).limit(1).first
+
+    query = "track:#{track["clean_title"]} #{track["remix_artist"]}" +
+            " #{track["featured_artists"]} artist:#{track["artist"]}"
+    result = RSpotify::Track.search(query).first
+    if result
+      track["spotify_result"] = result.id
+      track["no_spotify_results"] = nil
+    else
+      track["no_spotify_results"] = Time.now.utc.to_i
+      track["spotify_result"] = nil
+    end
+    tracks << track
+  end
+
+  track_bulk_ops = []
+  tracks.each do |t|
+    track_bulk_ops.push(
+      update_one: {
+        filter: { itemid: t["itemid"] } ,
+        update: { '$set' => t },
+        upsert: true
+      }
+    )
+  end
+
+  begin
+    track_collection.bulk_write(track_bulk_ops, ordered: false)
+  rescue Mongo::Error::BulkWriteError => e
+    warn "Error inserting into mongo, see result"
+    puts "Result:"
+    ap e.result
+    puts "Operations Attempted:"
+    ap track_bulk_ops
+  end
 end

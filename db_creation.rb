@@ -16,6 +16,8 @@
 #                "time" => 314,
 #         "description" => "It’s been pretty difficult keeping up with ",
 #         "itunes_link" => "http://hypem.com/go/itunes_search/Popeska",
+#      "spotify_result" => "6TJmQnO44YE5BtTxH8pop1",
+#   "no_spotify_result" => 1471194907,
 #            "loved_by" => ["longscott", "otheruser"]
 #}
 # user document
@@ -88,10 +90,14 @@ client[:tracks,
           #
           # I'm leaving this in here because it doesn't hurt anything and maybe
           # some day I'll come back and fix it.
-          { 'thumb_url_medium' => { '$regex': /^http:/ } } ,
-          { 'thumb_url_medium' => { 'exists': false    } } ,
-          { 'thumb_url_large'  => { '$regex': /^http:/ } } ,
-          { 'thumb_url_large'  => { 'exists': false    } } ,
+          { 'thumb_url_medium'   => { '$regex': /^http:/ } } ,
+          { 'thumb_url_medium'   => { 'exists': false    } } ,
+          { 'thumb_url_large'    => { '$regex': /^http:/ } } ,
+          { 'thumb_url_large'    => { 'exists': false    } } ,
+          { 'no_spotify_results' => { '$type':  "int"    } } ,
+          { 'no_spotify_results' => { 'exists':  false   } } ,
+          { 'spotify_result'     => { '$type':  "string" } } ,
+          { 'spotify_result'     => { 'exists':  false   } } ,
         ]
 
     }

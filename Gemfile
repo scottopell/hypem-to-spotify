@@ -10,6 +10,8 @@ gem 'json'
 gem 'httparty'
 gem 'will_paginate', '~> 3.1.0'
 
+gem 'i18n'
+gem 'activesupport', require: 'active_support/time'
 
 group :development do
   gem 'awesome_print'

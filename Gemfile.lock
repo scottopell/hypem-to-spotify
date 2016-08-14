@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    activesupport (3.0.20)
     awesome_print (1.7.0)
     backports (3.6.8)
     better_errors (2.1.1)
@@ -27,6 +28,7 @@ GEM
       domain_name (~> 0.5)
     httparty (0.14.0)
       multi_xml (>= 0.5.2)
+    i18n (0.5.4)
     json (1.8.3)
     jwt (1.5.4)
     listen (3.1.5)
@@ -105,12 +107,14 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  activesupport
   awesome_print
   better_errors
   binding_of_caller
   dotenv
   haml
   httparty
+  i18n
   json
   mongo (~> 2.2)
   nokogiri

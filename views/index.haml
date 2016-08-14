@@ -1,12 +1,4 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
 :css
-  .profile-box {
-    float: right;
-    width: 125px;
-  }
-  .header h1 {
-    display: inline-block;
-  }
   .paginator .current-page {
     font-weight: bold;
     font-size: 120%;
@@ -15,82 +7,70 @@
     display: inline-block;
   }
 
-.header
-  %h1 Hypem to Spotify
-  - if @user.nil?
-    %a{href: "/auth/spotify"}
-      Login to Spotify
-  - else
-    .profile-box
-      %p
-        = @user.display_name
-      %img{src: @user.images.first["url"], width: '100px', height: '100px'}
+%h2 Tracks
 
-.container
-  %h2 Tracks
-
-  %table
-    %thead
-      %th Title
-      %th Clean Title
-      %th Artist
-      %th Loved Count
-      %th Loved By
-      %th Is Remix?
-      %th Remix Artist
-      %th Feat Artist(s)
-    %tbody
-      - @tracks.each do |track|
-        %tr
-          %td
-            = track["title"]
-          %td
-            = track["clean_title"]
-          %td
-            = track["artist"]
-          %td
-            = track["loved_count"]
-          %td
-            = track["loved_by"]
-          %td
-            = track["is_remix"] ? "YES" : "NO"
-          %td
-            = track["remix_artist"]
-          %td
-            = track["featured_artists"]
-  .paginator
-    - if @page > 1
-      %a{href: "?page=#{@page - 1}&per_page=#{@per_page}"}
-        Previous Page
-    .pager
-      - (1..@total_pages).each do |i|
-        %a{href: "?page=#{i}&per_page=#{@per_page}"}
-          - if @page == i
-            %span.current-page
-              = i
-          - else
+%table
+  %thead
+    %th Title
+    %th Clean Title
+    %th Artist
+    %th Loved Count
+    %th Loved By
+    %th Is Remix?
+    %th Remix Artist
+    %th Feat Artist(s)
+  %tbody
+    - @tracks.each do |track|
+      %tr
+        %td
+          = track["title"]
+        %td
+          = track["clean_title"]
+        %td
+          = track["artist"]
+        %td
+          = track["loved_count"]
+        %td
+          = track["loved_by"]
+        %td
+          = track["is_remix"] ? "YES" : "NO"
+        %td
+          = track["remix_artist"]
+        %td
+          = track["featured_artists"]
+.paginator
+  - if @page > 1
+    %a{href: "?page=#{@page - 1}&per_page=#{@per_page}"}
+      Previous Page
+  .pager
+    - (1..@total_pages).each do |i|
+      %a{href: "?page=#{i}&per_page=#{@per_page}"}
+        - if @page == i
+          %span.current-page
             = i
-    - if @page < @total_pages
-      %a{href: "?page=#{@page + 1}&per_page=#{@per_page}"}
-        Next Page
+        - else
+          = i
+  - if @page < @total_pages
+    %a{href: "?page=#{@page + 1}&per_page=#{@per_page}"}
+      Next Page
 
-  %h2 Users
+%h2 Users
 
-  %ul
-    - @users.each do |user|
-      %li
-        = user["name"]
-  %h4 Pending Users
+%ul
+  - @users.each do |user|
+    %li
+      = user["name"]
+%h4 Pending Users
 
-  %ul
-    - @pending_users.each do |u|
-      %li
-        = u
+%ul
+  - @pending_users.each do |u|
+    %li
+      = u
 
-  %h3 Add User
-  %form{ action: "/submit_user_job", method: "post"}
-    %label
-      Username
-    %input{name: "username"}
+%h3 Add User
+%form{ action: "/submit_user_job", method: "post"}
+  %label
+    Username
+  %input{name: "username"}
 
-    %input{type: "submit"}
+  %input{type: "submit"}

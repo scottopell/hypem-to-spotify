@@ -1,0 +1,32 @@
+:css
+  iframe {
+    display: block;
+  }
+
+%h2
+  #{@target_user["name"]}'s favorite tracks
+
+%ul
+- @tracks.each do |track|
+  %li
+    #{track["title"]} by #{track["artist"]}:
+    - if track["spotify_result"]
+      %iframe{ src:"https://embed.spotify.com/?uri=spotify:track:#{track["spotify_result"]}", frameborder: 0, allowtransparency: true, height: 80, width: 300 }
+    - else
+      No result found on spotify, will check again next week
+
+
+%table
+  %thead
+    %th Title
+    %th Spotify Result
+    %th Embedded
+  %tbody
+    - @tracks.each do |track|
+      %tr
+        %td
+          = track["title"]
+        %td
+          = track["spotify_result"]
+        - if track["spotify_result"]
+          %td
