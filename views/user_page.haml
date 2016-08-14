@@ -7,6 +7,11 @@
 
 %iframe(src="https://embed.spotify.com/?uri=spotify:trackset:#{@target_user["name"]} hypem favorites:#{@track_id_string}" frameborder="0" allowtransparency="true" width=300 height=400)
 
+%br
+
+%a{href: "/hype_user?user_name=#{@target_user['name']}&confirm=true"}
+  Add tracks as Spotify playlist?
+
 %h3
   Tracks not found on spotify
 %ul

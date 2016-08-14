@@ -21,6 +21,7 @@ Mongo::Logger.logger       = ::Logger.new('mongo.log')
 Mongo::Logger.logger.level = ::Logger::DEBUG
 
 Dotenv.load
+RSpotify.authenticate(ENV["SPOTIFY_CLIENT_ID"], ENV["SPOTIFY_CLIENT_SECRET"])
 
 SPOTIFY_REDIRECT_PATH = '/auth/spotify/callback'
 SPOTIFY_REDIRECT_URI  = "http://localhost:4567#{SPOTIFY_REDIRECT_PATH}"
@@ -75,6 +76,9 @@ end
 get '/hype_user' do
   @tracks = []
   @target_user = user_collection.find(name: params['user_name']).limit(1).first
+  if @target_user.nil?
+    redirect "/#error_no-such-user"
+  end
 
   refresh_spotify_job = {
     "refresh_spotify_results" => true,
@@ -97,6 +101,24 @@ get '/hype_user' do
     .map{|t| t["spotify_result"]}
     .join(',')
 
+  if params['confirm']
+    playlist = spotify_user.create_playlist! "[HM] #{@target_user["name"]}"
+
+    to_go = @tracks.length
+    chunks = []
+    while to_go > 0
+      chunks << @tracks.slice(chunks.length * 100, (100 < to_go) ? 100 : to_go)
+      to_go -= chunks.last.length
+    end
+
+    chunks.each do |chunk|
+      uris = chunk
+        .select{|t| !t["spotify_result"].nil? }
+        .map{|t| "spotify:track:#{t['spotify_result']}"}
+
+      playlist.add_tracks! uris
+    end
+  end
 
   haml :user_page
 end
@@ -158,6 +180,8 @@ get SPOTIFY_REDIRECT_PATH do
         'credentials' => auth_response.parsed_response,
         'info' => info_response.parsed_response
       }
+
+      options['credentials']['token'] = options['credentials']['access_token']
       user = RSpotify::User.new options
       session[:spotify_hash] = user.to_hash
     end
@@ -169,7 +193,7 @@ get '/auth/spotify' do
   state = SecureRandom.hex
   cookies[:stateKey] = state
 
-  scope = 'user-read-private user-read-email'
+  scope = 'user-read-private user-read-email playlist-modify-public playlist-modify-private'
   redirect 'https://accounts.spotify.com/authorize?' +
            "response_type=code&" +
            "client_id=#{ENV['SPOTIFY_CLIENT_ID']}&" +
