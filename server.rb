@@ -15,6 +15,8 @@ track_collection = client[:tracks]
 user_collection  = client[:users]
 job_collection   = client[:jobs]
 
+$user = nil
+
 Mongo::Logger.logger       = ::Logger.new('mongo.log')
 Mongo::Logger.logger.level = ::Logger::DEBUG
 
@@ -89,6 +91,12 @@ get '/hype_user' do
     @tracks << track
   end
   job_collection.insert_one refresh_spotify_job
+
+  @track_id_string = @tracks
+    .select{|t| !t["spotify_result"].nil? }
+    .map{|t| t["spotify_result"]}
+    .join(',')
+
 
   haml :user_page
 end
@@ -175,24 +183,36 @@ def spotify_user
     return nil
   end
 
-  RSpotify::User.new(session[:spotify_hash])
+  $user || RSpotify::User.new(session[:spotify_hash])
 end
 
-def refresh_spotify_results client, itemids
+def refresh_spotify_results client, itemids, verbose=false
   track_collection = client[:tracks]
   tracks = []
   itemids.each do |itemid|
     track = track_collection.find(itemid: itemid).limit(1).first
 
-    query = "track:#{track["clean_title"]} #{track["remix_artist"]}" +
-            " #{track["featured_artists"]} artist:#{track["artist"]}"
+    # spotify doesn't seem to like '&' or 'and' in queries
+    and_regex = /(&|\band\b)/
+
+    remix  = track["remix_artist"].nil?     ? "" : track["remix_artist"].gsub(and_regex, '')
+    feat   = track["featured_artists"].nil? ? "" : track["featured_artists"].gsub(and_regex, '')
+    artist = track["artist"].nil?           ? "" : track["artist"].gsub(and_regex, '')
+
+    query = "track:#{track["clean_title"]}" +
+            " #{remix} #{feat} artist:#{artist}"
     result = RSpotify::Track.search(query).first
+
+    puts "Looking for #{Tty.blue}#{track["name"]}#{Tty.reset} by #{Tty.blue}#{track["artist"]}#{Tty.reset}" if verbose
     if result
       track["spotify_result"] = result.id
       track["no_spotify_results"] = nil
+
+      puts "#{Tty.green}\tFound on Spotify: \"#{result.name} by #{result.artists.first.name}\"#{Tty.reset}" if verbose
     else
       track["no_spotify_results"] = Time.now.utc.to_i
       track["spotify_result"] = nil
+      puts "#{Tty.red}\tNo Results#{Tty.reset}" if verbose
     end
     tracks << track
   end
@@ -218,3 +238,16 @@ def refresh_spotify_results client, itemids
     ap track_bulk_ops
   end
 end
+
+module Tty extend self
+  def blue; bold 34; end
+  def green; bold 32; end
+  def white; bold 39; end
+  def red; underline 31; end
+  def reset; escape 0; end
+  def bold n; escape "1;#{n}" end
+  def underline n; escape "4;#{n}" end
+  def escape n; "\033[#{n}m" if STDOUT.tty? end
+  def warn s; puts "#{red}#{s}#{reset}" end
+end
+
