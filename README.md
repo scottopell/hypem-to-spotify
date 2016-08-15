@@ -10,8 +10,7 @@ git clone https://github.com/scottopell/hypem-to-spotify/
 cd hypem-to-spotify
 bundle install
 ruby db_creation.rb
-ruby hypem.rb --update-hypem
-ruby server.rb
+ruby server.rb # rerun 'ruby server.rb' for automatic restart during dev
 open "http://localhost:4567"
 ```
 
@@ -20,11 +19,11 @@ open "http://localhost:4567"
 
 ## What Works
 - Scraping loved songs to mongodb
-- Debugging web interface (basically a sanity check for what's in the DB)
-- Search for these songs on spotify
-- Spotify OAuth on the frontend
-- integrate a job runner of some kind and rewrite the hypem->mongo as a job
+- Login with Spotify
+- Runs hypem->spotify scraping and spotify searching in a background thread
+- Add a hypem's user's fav tracks as spotify playlist
 
 ## What's left to do
-- add all these songs to a playlist
-- transition to full-on webapp
+- Polish
+- come up with an intelligent way to handle updating an existing hypem mirrored
+  list
