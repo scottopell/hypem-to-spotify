@@ -1,7 +1,10 @@
 !!!
 %html
   %head
-    %link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css")
+    %link(rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous")
+    %link(rel="stylesheet" href="https://cdn.rawgit.com/thomaspark/bootswatch/gh-pages/paper/bootstrap.min.css")
+    %script(src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous")
+    /%link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css")
     :css
       .profile-box {
         float: right;
@@ -12,14 +15,22 @@
       }
   %body
     .header
-      %h1 Hypem to Spotify
-      - if spotify_user.nil?
-        %a{href: "/auth/spotify"}
-          Login to Spotify
-      - else
-        .profile-box
+      .profile-box
+        - if spotify_user.nil?
+          %a{href: "/auth/spotify"}
+            Login to Spotify
+        - else
           %p
             = spotify_user.display_name
           %img{src: spotify_user.images.first["url"], width: '100px', height: '100px'}
+          %a{href: "/logout"}
+            Logout
     .container
+      - flash.keys.each do |k|
+        %div{class: "alert alert-dismissable #{FLASH_TYPE_CLASS[k]}"}
+          %button.close{type: 'button', 'data-dismiss' => 'alert'}
+          = flash[k]
+      %h1
+        %a{href: '/'}
+          Hypem to Spotify
       = yield

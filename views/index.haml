@@ -7,70 +7,29 @@
     display: inline-block;
   }
 
-%h2 Tracks
+%h2 Trending Tracks
 
-%table
-  %thead
-    %th Title
-    %th Clean Title
-    %th Artist
-    %th Loved Count
-    %th Loved By
-    %th Is Remix?
-    %th Remix Artist
-    %th Feat Artist(s)
-  %tbody
-    - @tracks.each do |track|
-      %tr
-        %td
-          = track["title"]
-        %td
-          = track["clean_title"]
-        %td
-          = track["artist"]
-        %td
-          = track["loved_count"]
-        %td
-          = track["loved_by"]
-        %td
-          = track["is_remix"] ? "YES" : "NO"
-        %td
-          = track["remix_artist"]
-        %td
-          = track["featured_artists"]
-.paginator
-  - if @page > 1
-    %a{href: "?page=#{@page - 1}&per_page=#{@per_page}"}
-      Previous Page
-  .pager
-    - (1..@total_pages).each do |i|
-      %a{href: "?page=#{i}&per_page=#{@per_page}"}
-        - if @page == i
-          %span.current-page
-            = i
-        - else
-          = i
-  - if @page < @total_pages
-    %a{href: "?page=#{@page + 1}&per_page=#{@per_page}"}
-      Next Page
 
 %h2 Users
 
 %ul
   - @users.each do |user|
     %li
-      = user["name"]
-%h4 Pending Users
+      %a{href: "/hype_user?user_name=#{user["name"]}"}
+        = user["name"]
 
-%ul
-  - @pending_users.each do |u|
-    %li
-      = u
+- if @pending_users.present?
+  %h4 Pending Users
+
+  %ul
+    - @pending_users.each do |user, num_jobs|
+      %li
+        #{user} - #{num_jobs} pending
 
 %h3 Add User
 %form{ action: "/submit_user_job", method: "post"}
   %label
     Username
   %input{name: "username"}
-
+  %br
   %input{type: "submit"}

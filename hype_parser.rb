@@ -5,7 +5,7 @@ module HypeParser
   DEFAULT_DELAY = 3
 
   def self.user_fav_url user, page=1
-    "https://api.hypem.com/v2/users/#{user}/favorites?key=swagger&page=#{page}"
+    "https://api.hypem.com/v2/users/#{user}/favorites?count=400&page=#{page}"
   end
 
   def self.does_user_exist? user
@@ -13,7 +13,7 @@ module HypeParser
     !response.parsed_response["uid"].nil?
   end
 
-  def self.get_all_users_fav_songs user, logging = false
+  def self.get_all_users_fav_songs user, logger
     songs = []
     page = 1
 
@@ -21,47 +21,45 @@ module HypeParser
 
     loop do
       response = HTTParty.get(user_fav_url(user, page))
-      if logging
-        puts "Requested page #{page}:"
-        puts "  Response code: #{response.code}"
-        puts "  Number of records: #{response.parsed_response.length}" if response.code == 200
-      end
+      logger.debug "Requested page #{page}:"
+      logger.debug "  Response code: #{response.code}"
+      logger.debug "  Number of records: #{response.parsed_response.length}" if response.code == 200
+
       if response.code == 403
-        puts "!! |403| waiting #{retry_delay} seconds, then retrying page #{page}" if logging
+        logger.debug "!! |403| waiting #{retry_delay} seconds, then retrying page #{page}"
         sleep retry_delay
         retry_delay *= 2
         next
       elsif response.code == 404
-        puts "|404| end of liked songs reached, breaking..." if logging
+        logger.debug "|404| end of liked songs reached, breaking..."
         break
       end
 
       songs.push(*response.parsed_response)
       page += 1
 
-      puts "Sleeping for #{DEFAULT_DELAY} seconds..." if logging
+      logger.debug "Sleeping for #{DEFAULT_DELAY} seconds..."
       sleep DEFAULT_DELAY
     end
 
     songs
   end
 
-  def self.update_hypem! users, client, logging = false
+  def self.update_hypem! users, client, logger
     db_users = {}
     users.each do |user|
-      songs = get_all_users_fav_songs user, logging
+      songs = get_all_users_fav_songs user, logger
 
-      if logging
-        puts "#{user} has #{songs.length} liked songs:"
-        songs.each do |entry|
-          puts "#{entry["artist"]} - #{entry["title"]}"
-        end
+      logger.debug "#{user} has #{songs.length} liked songs:"
+      songs.each do |entry|
+        logger.debug "#{entry["artist"]} - #{entry["title"]}"
       end
 
       collection_tracks = client[:tracks]
 
       db_users[user] = { "name" => user, "loved_songs" => [] }
 
+      logger.debug "Processing songs..."
       songs.map! do |s|
         db_users[user]["loved_songs"].push({ itemid: s["itemid"],
                                              ts_loved: s["ts_loved"] })
@@ -97,6 +95,7 @@ module HypeParser
         s.delete("ts_loved")
         s
       end
+      logger.debug "Done processing songs"
 
       track_bulk_ops = []
       songs.each do |s|
@@ -112,13 +111,15 @@ module HypeParser
       begin
         result = collection_tracks.bulk_write(track_bulk_ops, ordered: false)
       rescue Mongo::Error::BulkWriteError => e
-        warn "Error inserting into mongo, see result"
-        puts "Result:"
-        ap e.result
-        puts "Operations Attempted:"
-        ap track_bulk_ops
+        logger.error "Error inserting into mongo, see result"
+        logger.error "Result:"
+        logger.error e.result.inspect
+        logger.error "Operations Attempted:"
+        logger.error track_bulk_ops.inspect
       end
     end
+
+    logger.debug "Songs inserted into DB"
 
     collection_users = client[:users]
     user_bulk_ops = []
@@ -137,11 +138,12 @@ module HypeParser
     begin
       result = collection_users.bulk_write(user_bulk_ops, ordered: false)
     rescue Mongo::Error::BulkWriteError => e
-      warn "Error inserting into mongo, see result"
-      puts "Result:"
-      ap e.result
-      puts "Operations Attempted:"
-      ap user_bulk_ops
+      logger.error "Error inserting into mongo, see result"
+      logger.error "Result:"
+      logger.error e.result.inspect
+      logger.error "Operations Attempted:"
+      logger.error track_bulk_ops.inspect
     end
+    logger.debug "User(s) inserted into DB"
   end
 end

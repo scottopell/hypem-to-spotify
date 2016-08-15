@@ -76,6 +76,8 @@ GEM
       byebug (~> 9.0)
       pry (~> 0.10)
     rack (1.6.4)
+    rack-flash3 (1.0.5)
+      rack
     rack-protection (1.5.3)
       rack
     rack-test (0.6.3)
@@ -106,7 +108,6 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.7.2)
-    will_paginate (3.1.0)
 
 PLATFORMS
   ruby
@@ -125,11 +126,11 @@ DEPENDENCIES
   nokogiri
   pry
   pry-byebug
+  rack-flash3
   rerun
   rspotify!
   sinatra
   sinatra-contrib
-  will_paginate (~> 3.1.0)
 
 BUNDLED WITH
    1.12.4

@@ -5,12 +5,33 @@
 %h2
   #{@target_user["name"]}'s favorite tracks
 
-%iframe(src="https://embed.spotify.com/?uri=spotify:trackset:#{@target_user["name"]} hypem favorites:#{@track_id_string}" frameborder="0" allowtransparency="true" width=300 height=400)
+- if @is_pending_job
+  .alert.alert-info
+    These Spotify search results are being updated in the background.
+    This message will dissapear when that process is completed
+
+%p Preview songs (first 250):
+%iframe(src="https://embed.spotify.com/?uri=spotify:trackset:#{@target_user["name"]}-hypem-favorites:#{@track_id_string}" frameborder="0" allowtransparency="true" width=300 height=400)
+
+
 
 %br
 
-%a{href: "/hype_user?user_name=#{@target_user['name']}&confirm=true"}
-  Add tracks as Spotify playlist?
+- if spotify_user
+  %a{href: "/hype_user?user_name=#{@target_user['name']}&confirm=true"}
+    Add tracks as Spotify playlist?
+- else
+  %a{href: "/auth/spotify"}
+    Login to add these tracks as a playlist
+
+%br
+
+%p{style: "font-weight: bold"}
+  Tracks with a match on Spotify:
+= @found_count
+%p{style: "font-weight: bold"}
+  Tracks without a match on Spotify:
+= @not_found_count
 
 %h3
   Tracks not found on spotify

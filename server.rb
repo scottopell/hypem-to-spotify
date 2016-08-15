@@ -6,6 +6,7 @@ require 'sinatra/cookies'
 require 'open-uri'
 require 'base64'
 require 'uri'
+require 'logger'
 
 require_relative './hype_parser'
 
@@ -26,23 +27,35 @@ RSpotify.authenticate(ENV["SPOTIFY_CLIENT_ID"], ENV["SPOTIFY_CLIENT_SECRET"])
 SPOTIFY_REDIRECT_PATH = '/auth/spotify/callback'
 SPOTIFY_REDIRECT_URI  = "http://localhost:4567#{SPOTIFY_REDIRECT_PATH}"
 
+FLASH_TYPE_CLASS = {
+  notice: 'alert-success',
+  warning: 'alert-danger'
+}
+
+BATCH_SIZE = 100
+
 # http://www.sinatrarb.com/faq.html#sessions
 enable :sessions
+set :session_secret, ENV["SESSION_SEED"]
+
+use Rack::Flash
 
 configure :development do
   use BetterErrors::Middleware
   BetterErrors.application_root = __dir__
 end
 
+hype_logger    = Logger.new("hype_parser.log")
+spotify_logger = Logger.new("spotify_searcher.log")
 Thread.new do
   begin
     loop do
-      job_collection.find.each do |job|
+      job_collection.find.sort("_id" => 1).each do |job|
         if !job["scrape_user"].nil?
-          HypeParser.update_hypem! [job["username"]], client, false
+          HypeParser.update_hypem! [job["username"]], client, hype_logger
           job_collection.delete_one("_id" => job["_id"])
         elsif !job["refresh_spotify_results"].nil?
-          refresh_spotify_results client, job["itemids"]
+          refresh_spotify_results client, job["itemids"], spotify_logger
           job_collection.delete_one("_id" => job["_id"])
         end
       end
@@ -55,6 +68,11 @@ Thread.new do
 end
 
 get '/' do
+
+  @trending_tracks = track_collection.find
+    .limit(10)
+    .sort(loved_count: -1)
+
   @per_page = (params[:per_page] || 5).to_i
   @page     = (params[:page] || 1).to_i
 
@@ -65,12 +83,60 @@ get '/' do
 
   @total_pages = (track_collection.count / @per_page.to_f).ceil
 
-  @pending_users = job_collection.find.map{|job| job["username"] }
+  @pending_users = Hash.new 0
+  job_collection.find.each do |job|
+    @pending_users[job["username"]] += 1
+  end
 
-  @users  = user_collection.find
-  @user = spotify_user
+  @users = user_collection.find
+  @user  = spotify_user
 
   haml :index
+end
+
+def pending_job? client, type, username
+  job_collection = client[:jobs]
+  job_collection
+    .find({ type => true,
+            "username" => username })
+    .limit(1)
+    .first
+    .present?
+end
+
+def check_and_add_spotify_job client, username
+  job_collection   = client[:jobs]
+  user_collection  = client[:users]
+  track_collection = client[:tracks]
+
+  refresh_spotify_job = {
+    "refresh_spotify_results" => true,
+    "username" => username,
+    "itemids" => []
+  }
+  return nil if pending_job?(client, "refresh_spotify_results", username)
+
+  user = user_collection.find(name: username).limit(1).first
+  return nil if user.nil?
+
+  user["loved_songs"].each do |song|
+    track = track_collection.find(itemid: song["itemid"]).limit(1).first
+    next if track.nil?
+
+    should_check_again = track["spotify_result"].nil?
+    if !track["no_spotify_results"].nil?
+      should_check_again = Time.at(track["no_spotify_results"]) < 1.week.ago
+    end
+
+    if should_check_again
+      refresh_spotify_job["itemids"] << song["itemid"]
+    end
+  end
+
+  return nil if refresh_spotify_job["itemids"].empty?
+
+  job_collection.insert_one refresh_spotify_job
+  return refresh_spotify_job
 end
 
 get '/hype_user' do
@@ -80,43 +146,54 @@ get '/hype_user' do
     redirect "/#error_no-such-user"
   end
 
-  refresh_spotify_job = {
-    "refresh_spotify_results" => true,
-    "itemids" => []
-  }
+  check_and_add_spotify_job client, @target_user["name"]
 
   @target_user["loved_songs"].each do |song|
     track = track_collection.find(itemid: song["itemid"]).limit(1).first
-    if track["spotify_result"].nil? &&
-       Time.at(track["no_spotify_results"]) < 1.week.ago
-
-      refresh_spotify_job["itemids"] << song["itemid"]
-    end
-    @tracks << track
+    @tracks << track if track.present?
   end
-  job_collection.insert_one refresh_spotify_job
 
+  # take 250 here because of spotify embed limitations (really limitations
+  # on the length of the uri, roughly 6000 bytes, which is roughly 250 spotify
+  # ids)
   @track_id_string = @tracks
     .select{|t| !t["spotify_result"].nil? }
+    .take(250)
     .map{|t| t["spotify_result"]}
     .join(',')
 
   if params['confirm']
-    playlist = spotify_user.create_playlist! "[HM] #{@target_user["name"]}"
+    if spotify_user.nil?
+      flash[:notice] = "You need to login first"
+    else
+      playlist = spotify_user.create_playlist! "[HM] #{@target_user["name"]}"
+      # TODO note the time this was created and the playlist ID
+      # because at some point a user will "love" more songs and we want to be
+      # able to add to the same playlist
 
-    to_go = @tracks.length
-    chunks = []
-    while to_go > 0
-      chunks << @tracks.slice(chunks.length * 100, (100 < to_go) ? 100 : to_go)
-      to_go -= chunks.last.length
+      chunks = @tracks.each_slice(100).to_a
+
+      chunks.each do |chunk|
+        uris = chunk
+          .select{|t| !t["spotify_result"].nil? }
+          .map{|t| "spotify:track:#{t['spotify_result']}"}
+
+        playlist.add_tracks! uris
+      end
     end
+  end
 
-    chunks.each do |chunk|
-      uris = chunk
-        .select{|t| !t["spotify_result"].nil? }
-        .map{|t| "spotify:track:#{t['spotify_result']}"}
+  @is_pending_job = pending_job? client,
+                                 "refresh_spotify_results",
+                                 @target_user["name"]
 
-      playlist.add_tracks! uris
+  @found_count = 0
+  @not_found_count = 0
+  @tracks.each do |track|
+    if track["spotify_result"].present?
+      @found_count += 1
+    else
+      @not_found_count += 1
     end
   end
 
@@ -124,14 +201,17 @@ get '/hype_user' do
 end
 
 post '/submit_user_job' do
-  status = "job_submitted"
   if HypeParser.does_user_exist? params[:username]
-    job_collection.insert_one scrape_user: true, username: params[:username]
+    job_collection.insert_one scrape_user: true,
+                              username: params[:username]
+    check_and_add_spotify_job client, params[:username]
+
+    flash[:notice] = "Job submitted successfully"
   else
-    status = "err_user-doesnt-exist"
+    flash[:alert] = "Error: user doesn't exist"
   end
 
-  redirect "/##{status}"
+  redirect '/'
 end
 
 get SPOTIFY_REDIRECT_PATH do
@@ -140,6 +220,7 @@ get SPOTIFY_REDIRECT_PATH do
   storedState = cookies[:stateKey]
 
   if state.nil? || state != storedState
+    flash[:warning] = "Error logging in, try again."
     redirect '/#error=state_mismatch'
   else
     cookies[:stateKey] = nil
@@ -186,7 +267,8 @@ get SPOTIFY_REDIRECT_PATH do
       session[:spotify_hash] = user.to_hash
     end
   end
-  redirect to('/')
+  flash[:notice] = "Logged in successfully"
+  redirect to('#')
 end
 
 get '/auth/spotify' do
@@ -202,6 +284,13 @@ get '/auth/spotify' do
            "state=#{state}"
 end
 
+get '/logout' do
+  session.clear
+
+  flash[:notice] = "Logged out successfully"
+  redirect '/'
+end
+
 def spotify_user
   if session[:spotify_hash].nil?
     return nil
@@ -210,57 +299,83 @@ def spotify_user
   $user || RSpotify::User.new(session[:spotify_hash])
 end
 
-def refresh_spotify_results client, itemids, verbose=false
+def refresh_spotify_results client, itemids, logger
   track_collection = client[:tracks]
-  tracks = []
-  itemids.each do |itemid|
-    track = track_collection.find(itemid: itemid).limit(1).first
+  job_collection   = client[:jobs]
 
-    # spotify doesn't seem to like '&' or 'and' in queries
-    and_regex = /(&|\band\b)/
+  slice_count = (itemids.count.to_f / BATCH_SIZE).ceil
+  itemids.each_slice(BATCH_SIZE).with_index do |slice, slice_index|
+    tracks = []
+    logger.debug "Starting chunk #{slice_index} out of #{slice_count}"
 
-    remix  = track["remix_artist"].nil?     ? "" : track["remix_artist"].gsub(and_regex, '')
-    feat   = track["featured_artists"].nil? ? "" : track["featured_artists"].gsub(and_regex, '')
-    artist = track["artist"].nil?           ? "" : track["artist"].gsub(and_regex, '')
+    slice.each_with_index do |itemid, index|
+      logger.debug "Processing item #{index} out of #{slice.count} (chunk #{slice_index})"
+      track = track_collection.find(itemid: itemid).limit(1).first
 
-    query = "track:#{track["clean_title"]}" +
-            " #{remix} #{feat} artist:#{artist}"
-    result = RSpotify::Track.search(query).first
+      # spotify doesn't seem to like '&' or 'and' in queries
+      and_regex = /(&|\band\b)/
 
-    puts "Looking for #{Tty.blue}#{track["name"]}#{Tty.reset} by #{Tty.blue}#{track["artist"]}#{Tty.reset}" if verbose
-    if result
-      track["spotify_result"] = result.id
-      track["no_spotify_results"] = nil
+      remix  = track["remix_artist"].nil?     ? "" : track["remix_artist"].gsub(and_regex, '')
+      feat   = track["featured_artists"].nil? ? "" : track["featured_artists"].gsub(and_regex, '')
+      artist = track["artist"].nil?           ? "" : track["artist"].gsub(and_regex, '')
 
-      puts "#{Tty.green}\tFound on Spotify: \"#{result.name} by #{result.artists.first.name}\"#{Tty.reset}" if verbose
-    else
-      track["no_spotify_results"] = Time.now.utc.to_i
-      track["spotify_result"] = nil
-      puts "#{Tty.red}\tNo Results#{Tty.reset}" if verbose
+      query = "track:#{track["clean_title"]}" +
+              " #{remix} #{feat} artist:#{artist}"
+      result = RSpotify::Track.search(query).first
+
+      logger.debug "Looking for #{Tty.blue}#{track["name"]}#{Tty.reset} by #{Tty.blue}#{track["artist"]}#{Tty.reset}"
+      if result
+        track["spotify_result"] = result.id
+        track["no_spotify_results"] = nil
+
+        logger.debug "#{Tty.green}\tFound on Spotify: \"#{result.name} by #{result.artists.first.name}\"#{Tty.reset}"
+      else
+        track["no_spotify_results"] = Time.now.utc.to_i
+        track["spotify_result"] = nil
+        logger.debug "#{Tty.red}\tNo Results#{Tty.reset}"
+      end
+      tracks << track
     end
-    tracks << track
-  end
 
-  track_bulk_ops = []
-  tracks.each do |t|
-    track_bulk_ops.push(
-      update_one: {
-        filter: { itemid: t["itemid"] } ,
-        update: { '$set' => t },
-        upsert: true
-      }
-    )
-  end
+    logger.debug "Finished searching on spotify for chunk #{slice_index}"
 
-  begin
-    track_collection.bulk_write(track_bulk_ops, ordered: false)
-  rescue Mongo::Error::BulkWriteError => e
-    warn "Error inserting into mongo, see result"
-    puts "Result:"
-    ap e.result
-    puts "Operations Attempted:"
-    ap track_bulk_ops
+    track_bulk_ops = []
+    tracks.each do |t|
+      track_bulk_ops.push(
+        update_one: {
+          filter: { itemid: t["itemid"] } ,
+          update: { '$set' => t },
+          upsert: true
+        }
+      )
+    end
+
+    logger.debug "Inserting songs for chunk #{slice_index} into DB..."
+
+    begin
+      track_collection.bulk_write(track_bulk_ops, ordered: false)
+    rescue Mongo::Error::BulkWriteError => e
+      logger.error "Error inserting into mongo, see result"
+      logger.error "Result:"
+      logger.error e.result.inspect
+      logger.error "Operations Attempted:"
+      logger.error track_bulk_ops.inspect
+    end
+    logger.debug "Successfully inserted songs for chunk #{slice_index}"
+
+    begin
+      operation = [ { "refresh_spotify_results" => true },
+                    { "$pullAll" => { "itemids" => slice } } ]
+      job_collection.update_many(*operation)
+    rescue Mongo::Error => e
+      logger.error "Error removing itemids in pullAll operation"
+      logger.error "Result:"
+      logger.error e.result.inspect
+      logger.error "Operations Attempted:"
+      logger.error operation.inspect
+    end
   end
+  logger.debug "Processed all chunks"
 end
 
 module Tty extend self

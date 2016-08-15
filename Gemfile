@@ -8,10 +8,10 @@ gem 'haml'
 gem 'nokogiri'
 gem 'json'
 gem 'httparty'
-gem 'will_paginate', '~> 3.1.0'
+gem 'rack-flash3', require: 'rack-flash'
 
 gem 'i18n'
-gem 'activesupport', require: 'active_support/time'
+gem 'activesupport', require: 'active_support/all'
 
 group :development do
   gem 'awesome_print'
