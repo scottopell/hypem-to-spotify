@@ -5,7 +5,7 @@ on hype machine to a spotify playlist.
 
 ## Usage
 ```sh
-mongod & # or run this in another terminal or tmux/screen or whatever
+mongod --fork # or run this in another terminal or tmux/screen or whatever
 git clone https://github.com/scottopell/hypem-to-spotify/
 cd hypem-to-spotify
 bundle install
