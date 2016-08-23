@@ -10,7 +10,7 @@ require 'logger'
 
 require_relative './hype_parser'
 
-client = Mongo::Client.new('mongodb://127.0.0.1:27017/hype')
+client = Mongo::Client.new(['mongo-host:27017'], database: 'hype')
 
 track_collection = client[:tracks]
 user_collection  = client[:users]
@@ -21,11 +21,11 @@ $user = nil
 Mongo::Logger.logger       = ::Logger.new('mongo.log')
 Mongo::Logger.logger.level = ::Logger::DEBUG
 
-Dotenv.load
+Dotenv.load if settings.development?
 RSpotify.authenticate(ENV["SPOTIFY_CLIENT_ID"], ENV["SPOTIFY_CLIENT_SECRET"])
 
 SPOTIFY_REDIRECT_PATH = '/auth/spotify/callback'
-SPOTIFY_REDIRECT_URI  = "http://localhost:4567#{SPOTIFY_REDIRECT_PATH}"
+SPOTIFY_REDIRECT_URI  = "http://localhost:#{ENV['PORT']}#{SPOTIFY_REDIRECT_PATH}"
 
 FLASH_TYPE_CLASS = {
   notice: 'alert-success',

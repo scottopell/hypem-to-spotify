@@ -16,6 +16,26 @@ open "http://localhost:4567"
 
 ![Web Interface](http://i.imgur.com/KXChnrQ.png)
 
+## Docker Usage
+Docker is intended for production deployment
+```sh
+docker network create -d bridge hype_project
+docker build -t hypem-to-spotify .
+docker run \
+  -p 27017:27017 \
+  --network=hype_project \
+  --name mongo-host \
+  -d \
+  mongo
+docker run \
+  -p 3000:3000 \
+  --rm \
+  --network=hype_project \
+  --name=app \
+  --env-file=.env \
+  hypem-to-spotify
+```
+
 
 ## What Works
 - Scraping loved songs to mongodb
