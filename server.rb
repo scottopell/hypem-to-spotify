@@ -38,6 +38,8 @@ BATCH_SIZE = 100
 enable :sessions
 set :session_secret, ENV["SESSION_SEED"]
 
+set :port, ENV['PORT']
+
 use Rack::Flash
 
 configure :development do
