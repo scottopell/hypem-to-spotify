@@ -14,11 +14,17 @@ ruby server.rb # rerun 'ruby server.rb' for automatic restart during dev
 open "http://localhost:4567"
 ```
 
-![Web Interface](http://i.imgur.com/KXChnrQ.png)
+![Web Interface](http://i.imgur.com/YCMFcer.png)
 
 ## Docker Usage
-Docker is intended for production deployment
+Docker is intended for production deployment (kinda).
+
+Choose either `docker-compose` or the commands under "MANUAL INSTRUCTIONS"
+below.
 ```sh
+docker-compose up
+
+# MANUAL INSTRUCTIONS
 docker network create -d bridge hype_project
 docker build -t hypem-to-spotify .
 docker run \
