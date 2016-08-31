@@ -1,0 +1,20 @@
+version: '2'
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "3000:80"
+    networks:
+      - hype-project
+  mongo-host:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data:/data/db
+    networks:
+      - hype-project
+networks:
+  hype-project:
+    driver: bridge
