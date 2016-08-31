@@ -18,10 +18,10 @@
 %br
 
 - if spotify_user
-  %a{href: "/hype_user?user_name=#{@target_user['name']}&confirm=true"}
+  %a.spotify-esque{href: "/hype_user?user_name=#{@target_user['name']}&confirm=true"}
     Add tracks as Spotify playlist?
 - else
-  %a{href: "/auth/spotify"}
+  %a.spotify-esque{href: "/auth/spotify"}
     Login to add these tracks as a playlist
 
 %br
@@ -35,8 +35,7 @@
 
 %h3
   Tracks not found on spotify
-%ul
-- @tracks.each do |track|
-  - if track["spotify_result"].nil?
-    %li
-      #{track["title"]} by #{track["artist"]}:
+%pre{style: "max-height: 400px; overflow: auto"}
+  %code
+    - @tracks.select{|t| t["spotify_result"].nil?}.each do |track|
+      #{track["title"]} by #{track["artist"]}<br>

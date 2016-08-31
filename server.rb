@@ -73,9 +73,12 @@ end
 
 get '/' do
 
-  @trending_tracks = track_collection.find
+  @trending_tracks = track_collection
+    .find("spotify_result" => { "$type" => "string" })
     .limit(10)
     .sort(loved_count: -1)
+
+  @tt_uris = @trending_tracks.map{|t| t["spotify_result"]}.join(",")
 
   @per_page = (params[:per_page] || 5).to_i
   @page     = (params[:page] || 1).to_i
