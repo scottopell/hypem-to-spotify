@@ -10,7 +10,9 @@ require 'logger'
 
 require_relative './hype_parser'
 
-client = Mongo::Client.new(['mongo-host:27017'], database: 'hype')
+mongo_host = 'mongo-host:27017'
+mongo_host = 'localhost:27017' if settings.development?
+client = Mongo::Client.new([mongo_host], database: 'hype')
 
 track_collection = client[:tracks]
 user_collection  = client[:users]
